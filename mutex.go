@@ -3,14 +3,10 @@ package synctracer // import "go.oneofone.dev/synctracer"
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
-)
-
-var (
-	PrintAfter = time.Millisecond * 500
-	PrintEvery = time.Second * 2
 )
 
 type RWMutex struct {
@@ -23,6 +19,10 @@ type RWMutex struct {
 }
 
 func (m *RWMutex) Lock() {
+	if PrintAfter == 0 {
+		m.mu.Lock()
+		return
+	}
 	m.waitForLock()
 	m.mu.Lock()
 	m.lastLock.Store(callerPath(0))
@@ -30,12 +30,20 @@ func (m *RWMutex) Lock() {
 }
 
 func (m *RWMutex) Unlock() {
+	if PrintAfter == 0 {
+		m.mu.Unlock()
+		return
+	}
 	m.mu.Unlock()
 	m.lastLock.Store("")
 	atomic.StoreInt64(&m.tsLock, 0)
 }
 
 func (m *RWMutex) RLock() {
+	if PrintAfter == 0 {
+		m.mu.RLock()
+		return
+	}
 	m.waitForLock()
 	m.mu.RLock()
 	m.lastRLock.Store(callerPath(0))
@@ -43,6 +51,11 @@ func (m *RWMutex) RLock() {
 }
 
 func (m *RWMutex) RUnlock() {
+	if PrintAfter == 0 {
+		m.mu.RUnlock()
+		return
+	}
+
 	m.mu.RUnlock()
 	m.lastRLock.Store("")
 	atomic.StoreInt64(&m.tsRLock, 0)
@@ -50,7 +63,7 @@ func (m *RWMutex) RUnlock() {
 
 func (m *RWMutex) waitForLock() {
 	lastPrint := int64(0)
-	for {
+	for PrintAfter > 0 {
 		n := now()
 		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 {
 			if diff := time.Duration(n - ts); diff > PrintAfter {
@@ -69,7 +82,7 @@ func (m *RWMutex) waitForLock() {
 		} else {
 			break
 		}
-		time.Sleep(time.Millisecond)
+		runtime.Gosched()
 	}
 }
 
@@ -81,6 +94,11 @@ type Mutex struct {
 }
 
 func (m *Mutex) Lock() {
+	if PrintAfter == 0 {
+		m.mu.Lock()
+		return
+	}
+
 	m.waitForLock()
 	m.mu.Lock()
 	m.lastLock.Store(callerPath(0))
@@ -95,7 +113,7 @@ func (m *Mutex) Unlock() {
 
 func (m *Mutex) waitForLock() {
 	lastPrint := int64(0)
-	for {
+	for PrintAfter > 0 {
 		n := now()
 		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 {
 			if diff := time.Duration(n - ts); diff > PrintAfter {
@@ -107,7 +125,7 @@ func (m *Mutex) waitForLock() {
 		} else {
 			break
 		}
-		time.Sleep(time.Millisecond)
+		runtime.Gosched()
 	}
 }
 

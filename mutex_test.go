@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-func TestSlow(t *testing.T) {
+func TestRWMutex(t *testing.T) {
 	var (
 		mu RWMutex
 		wg sync.WaitGroup
 	)
 	PrintAfter = time.Microsecond * 100
-	wg.Add(2)
+	wg.Add(3)
 	mu.Lock()
 	go func() {
 		defer wg.Done()
@@ -23,6 +23,13 @@ func TestSlow(t *testing.T) {
 	go doOther2(&wg, &mu)
 
 	wg.Wait()
+}
+
+func TestSlowCall(t *testing.T) {
+	SlowCall(func() {
+		time.Sleep(time.Second)
+		t.Log("done")
+	}, 1, "blah", t)
 }
 
 func doOther(wg *sync.WaitGroup, mu *RWMutex) {

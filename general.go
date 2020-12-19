@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+var (
+	PrintAfter = time.Millisecond * 200
+	PrintEvery = time.Second * 5
+)
+
 func now() int64 {
 	return time.Now().UnixNano()
 }
