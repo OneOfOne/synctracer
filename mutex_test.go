@@ -11,12 +11,12 @@ func TestSlow(t *testing.T) {
 		mu RWMutex
 		wg sync.WaitGroup
 	)
-	timeout = time.Microsecond * 100
+	PrintAfter = time.Microsecond * 100
 	wg.Add(2)
 	mu.Lock()
 	go func() {
 		defer wg.Done()
-		time.Sleep(timeout * 20)
+		time.Sleep(time.Second * 2)
 		mu.Unlock()
 	}()
 	go doOther(&wg, &mu)
@@ -28,13 +28,13 @@ func TestSlow(t *testing.T) {
 func doOther(wg *sync.WaitGroup, mu *RWMutex) {
 	defer wg.Done()
 	mu.Lock()
-	time.Sleep(timeout * 10)
+	time.Sleep(PrintAfter * 10)
 	mu.Unlock()
 }
 
 func doOther2(wg *sync.WaitGroup, mu *RWMutex) {
 	defer wg.Done()
 	mu.Lock()
-	time.Sleep(timeout * 10)
+	time.Sleep(PrintAfter * 10)
 	mu.Unlock()
 }

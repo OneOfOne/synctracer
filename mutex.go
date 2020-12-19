@@ -8,12 +8,10 @@ import (
 	"time"
 )
 
-var timeout = time.Millisecond * 500
-
-func SetTimeout(to time.Duration) time.Duration {
-	old := atomic.SwapInt64((*int64)(&timeout), int64(to))
-	return time.Duration(old)
-}
+var (
+	PrintAfter = time.Millisecond * 500
+	PrintEvery = time.Second * 2
+)
 
 type RWMutex struct {
 	mu sync.RWMutex
@@ -51,20 +49,21 @@ func (m *RWMutex) RUnlock() {
 }
 
 func (m *RWMutex) waitForLock() {
-	printedLock, printedRLock := false, false
-	for !printedLock && !printedRLock {
-		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 && !printedLock {
-			if diff := time.Duration(now() - ts); diff > timeout {
-				if fn, _ := m.lastLock.Load().(string); fn != "" {
-					log.Output(1, fmt.Sprintf("[%s] LOCK STUCK (%v) @ %s", callerPath(1), diff, fn))
-					printedLock = true
+	lastPrint := int64(0)
+	for {
+		n := now()
+		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 {
+			if diff := time.Duration(n - ts); diff > PrintAfter {
+				if fn, _ := m.lastLock.Load().(string); fn != "" && (n-lastPrint) >= int64(PrintEvery) {
+					log.Output(1, fmt.Sprintf("LOCK STUCK [%s] %v @ %s", callerPath(1), diff, fn))
+					lastPrint = n
 				}
 			}
-		} else if ts := atomic.LoadInt64(&m.tsRLock); ts != 0 && !printedRLock {
-			if diff := time.Duration(now() - ts); diff > timeout {
+		} else if ts := atomic.LoadInt64(&m.tsRLock); ts != 0 && (n-lastPrint) >= int64(PrintEvery) {
+			if diff := time.Duration(n - ts); diff > PrintAfter {
 				if fn, _ := m.lastLock.Load().(string); fn != "" {
-					log.Output(1, fmt.Sprintf("[%s] RLOCK STUCK (%v) @ %s", callerPath(1), diff, fn))
-					printedRLock = true
+					log.Output(1, fmt.Sprintf("RLOCK STUCK [%s] %v @ %s", callerPath(1), diff, fn))
+					lastPrint = n
 				}
 			}
 		} else {
@@ -95,12 +94,14 @@ func (m *Mutex) Unlock() {
 }
 
 func (m *Mutex) waitForLock() {
+	lastPrint := int64(0)
 	for {
+		n := now()
 		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 {
-			if diff := time.Duration(now() - ts); diff > timeout {
-				if fn, _ := m.lastLock.Load().(string); fn != "" {
-					log.Output(1, fmt.Sprintf("[%s] LOCK STUCK (%v) @ %s", callerPath(1), diff, fn))
-					break
+			if diff := time.Duration(n - ts); diff > PrintAfter {
+				if fn, _ := m.lastLock.Load().(string); fn != "" && (n-lastPrint) >= int64(PrintEvery) {
+					log.Output(1, fmt.Sprintf("LOCK STUCK [%s] %v @ %s", callerPath(1), diff, fn))
+					lastPrint = n
 				}
 			}
 		} else {
