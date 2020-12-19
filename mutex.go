@@ -73,3 +73,41 @@ func (m *RWMutex) waitForLock() {
 		time.Sleep(time.Millisecond)
 	}
 }
+
+type Mutex struct {
+	mu sync.Mutex
+
+	tsLock   int64
+	lastLock atomic.Value
+}
+
+func (m *Mutex) Lock() {
+	m.waitForLock()
+	m.mu.Lock()
+	m.lastLock.Store(callerPath(0))
+	atomic.StoreInt64(&m.tsLock, now())
+}
+
+func (m *Mutex) Unlock() {
+	m.mu.Unlock()
+	m.lastLock.Store("")
+	atomic.StoreInt64(&m.tsLock, 0)
+}
+
+func (m *Mutex) waitForLock() {
+	for {
+		if ts := atomic.LoadInt64(&m.tsLock); ts != 0 {
+			if diff := time.Duration(now() - ts); diff > timeout {
+				if fn, _ := m.lastLock.Load().(string); fn != "" {
+					log.Output(1, fmt.Sprintf("[%s] LOCK STUCK (%v) @ %s", callerPath(1), diff, fn))
+					break
+				}
+			}
+		} else {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+type WaitGroup = sync.WaitGroup
