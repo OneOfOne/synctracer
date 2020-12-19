@@ -1,4 +1,4 @@
-package synctracer
+package synctracer // import "go.oneofone.dev/synctracer"
 
 import (
 	"fmt"
